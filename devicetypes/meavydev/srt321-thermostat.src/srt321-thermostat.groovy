@@ -112,6 +112,13 @@ def parse(String description)
 	result
 }
 
+def updated() 
+{
+	log.debug "preferences updated"
+
+	state.configNeeded = true
+}
+
 def zwaveEvent(physicalgraph.zwave.commands.thermostatmodev1.ThermostatModeSet cmd)
 {
 	def map = [:]
