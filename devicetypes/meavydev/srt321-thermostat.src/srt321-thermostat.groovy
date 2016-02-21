@@ -1,11 +1,12 @@
 /*
- * SRT321 Thermostat by MeavDev
+ * SRT321 Thermostat by MeavyDev
  * With support for an associated switch set by the SRT321 helper app
  */
 metadata 
 {
 	definition (name: "SRT321 Thermostat", namespace: "meavydev", author: "MeavyDev") 
     {
+    	capability "Actuator"
 		capability "Temperature Measurement"
 		capability "Thermostat"
 		capability "Configuration"
@@ -17,9 +18,10 @@ metadata
 		command "setTemperature"
         
 		command "setupDevice" 
-        
-		fingerprint deviceId: "0x0800"
-		fingerprint inClusters: "0x72, 0x86, 0x80, 0x84, 0x31, 0x43, 0x85, 0x70, 0xEF, 0x40, 0x25"
+        		
+		// fingerprint deviceId: "0x0800", inClusters: "0x25, 0x31, 0x40, 0x43, 0x70, 0x72, 0x80, 0x84, 0x85, 0x86, 0xef"
+		fingerprint deviceId: "0x0800" 
+        fingerprint inClusters: "0x72,0x86,0x80,0x84,0x31,0x43,0x85,0x70,0x40,0x25"
 	}
 
 	// simulator metadata
@@ -85,19 +87,13 @@ metadata
 
 	main "heatingSetpoint"
     details(["heatingSetpoint", "battery", "refresh", "configure", "temperature", "mode"])
-}
 
-preferences 
-{
-    section ("Wakeup interval...")
+    preferences 
     {
-    	input "userWakeUpInterval", "number", title: "Wake Up Interval (seconds)", description: "Default 3600 sec (10 minutes - 7 days)", defaultValue: '3600', required: false, displayDuringSetup: true
-    }
-    
-    // This is the "Device Network Id" displayed in the IDE
-    section ("Associated z-wave switch network Id...")
-    {
-    	input "userAssociatedDevice", "string", title: "Associated switch ZWave network Id (hex)", required: false, displayDuringSetup: true
+        input "userWakeUpInterval", "number", title: "Wakeup interval...", description: "Wake Up Interval (seconds)", defaultValue: 3600, required: false, displayDuringSetup: false
+
+        // This is the "Device Network Id" displayed in the IDE
+        input "userAssociatedDevice", "string", title:"Associated z-wave switch network Id...", description:"Associated switch ZWave network Id (hex)", required: false, displayDuringSetup: false
     }
 }
 
@@ -114,11 +110,6 @@ def parse(String description)
     
 //	log.debug "Parse returned $result"
 	result
-}
-
-def configure() 
-{
-	state.configNeeded = true
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.thermostatmodev1.ThermostatModeSet cmd)
@@ -242,17 +233,68 @@ def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicReport cmd)
 def zwaveEvent(physicalgraph.zwave.Command cmd) 
 {
 	log.warn "Unexpected zwave command $cmd"
+    
+    delayBetween([
+		zwave.sensorMultilevelV1.sensorMultilevelGet().format(), // current temperature
+		zwave.thermostatSetpointV1.thermostatSetpointGet(setpointType: 1).format(),
+		zwave.thermostatModeV1.thermostatModeGet().format(),
+		zwave.thermostatFanModeV3.thermostatFanModeGet().format(),
+		zwave.thermostatOperatingStateV1.thermostatOperatingStateGet().format()
+	], 1000)
+
 }
 
 // Command Implementations
+
+def configure() 
+{
+	log.debug "configure"
+	state.configNeeded = true
+    
+    // Normally this won't do anything as the thermostat is asleep, 
+    // but do this in case it helps with the initial config
+	delayBetween([
+		zwave.thermostatModeV1.thermostatModeSupportedGet().format(),
+		zwave.associationV1.associationSet(groupingIdentifier:1, nodeId:[zwaveHubNodeId]).format(),
+        // Set hub to get battery reports / warnings
+        zwave.associationV1.associationSet(groupingIdentifier:3, nodeId:[zwaveHubNodeId]).format(),
+        // Set hub to get set point reports
+        zwave.associationV1.associationSet(groupingIdentifier:4, nodeId:[zwaveHubNodeId]).format(),
+        // Set hub to get multi-level sensor reports (defaults to temperature changes of > 1C)
+        zwave.associationV1.associationSet(groupingIdentifier:5, nodeId:[zwaveHubNodeId]).format(),
+        // set the temperature sensor On
+		zwave.configurationV1.configurationSet(configurationValue: [0xff], parameterNumber: 1, size: 1).format()
+	], 1000)
+}
+
 def poll() 
 {
-	// state.refreshNeeded = true
+	log.debug "poll"
+
+	// Normally this won't do anything as the thermostat is asleep, 
+    // but do this in case it helps with the initial config
+	delayBetween([
+		zwave.sensorMultilevelV1.sensorMultilevelGet().format(), // current temperature
+		zwave.thermostatSetpointV1.thermostatSetpointGet(setpointType: physicalgraph.zwave.commands.thermostatsetpointv1.ThermostatSetpointSet.SETPOINT_TYPE_HEATING_1).format(),
+		zwave.thermostatModeV1.thermostatModeGet().format(),
+		zwave.thermostatOperatingStateV1.thermostatOperatingStateGet().format()
+	], 1000)
 }
 
 def refresh()
 {
+	log.debug "refresh"
+
 	state.refreshNeeded = true
+    
+    // Normally this won't do anything as the thermostat is asleep, 
+    // but do this in case it helps with the initial config
+	delayBetween([
+		zwave.sensorMultilevelV1.sensorMultilevelGet().format(), // current temperature
+		zwave.thermostatSetpointV1.thermostatSetpointGet(setpointType: physicalgraph.zwave.commands.thermostatsetpointv1.ThermostatSetpointSet.SETPOINT_TYPE_HEATING_1).format(),
+		zwave.thermostatModeV1.thermostatModeGet().format(),
+		zwave.thermostatOperatingStateV1.thermostatOperatingStateGet().format()
+	], 1000)
 }
 
 def quickSetHeat(degrees) 
