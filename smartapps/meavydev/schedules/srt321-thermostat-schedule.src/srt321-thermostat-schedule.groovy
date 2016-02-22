@@ -221,9 +221,9 @@ def setTheTemp()
     log.debug "Calendar DOW: " + currentDayOfWeek
     log.debug "Configured DOW(s): " + dayOfWeek
 
-	boolean modeOK = settings.smartThingsMode ? settings.smartThingsMode == location.currentMode : true;
+	boolean modeOK = settings.smartThingsMode ? settings.smartThingsMode == location.currentMode.name : true;
     
-    log.debug "Set $settings.heatingSetpoint with Mode OK: $modeOK for $location.currentMode"
+    log.debug "Set $settings.heatingSetpoint with Mode: $settings.smartThingsMode = $modeOK for $location.currentMode"
     
     // If we have hit the condition to schedule this then lets do it
     if (doChange == true && modeOK == true)
@@ -242,3 +242,4 @@ def setTheTemp()
 
     initialize() // Setup the next check schedule
 }
+
