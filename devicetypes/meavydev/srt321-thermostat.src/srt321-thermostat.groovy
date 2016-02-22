@@ -306,7 +306,7 @@ def refresh()
 
 def quickSetHeat(degrees) 
 {
-	setHeatingSetpoint(degrees, 1000)
+	setHeatingSetpoint(degrees)
 	log.debug("Degrees at quicksetheat: $degrees")
 }
 
@@ -314,7 +314,6 @@ def setTempUp()
 { 
     def newtemp = device.currentValue("heatingSetpoint").toInteger() + 1
     log.debug "Setting temp up: $newtemp"
-    sendEvent(name: 'heatingSetpoint', value: newtemp)
     quickSetHeat(newtemp)
 }
 
@@ -322,27 +321,26 @@ def setTempDown()
 { 
     def newtemp = device.currentValue("heatingSetpoint").toInteger() - 1
     log.debug "Setting temp down: $newtemp"
-    sendEvent(name: 'heatingSetpoint', value: newtemp)
     quickSetHeat(newtemp)
 }
 
 def setTemperature(temp)
 {
 	log.debug "setTemperature $temp"
-    sendEvent(name: 'heatingSetpoint', value: temp)
-
     quickSetHeat(temp)
 }
 
-def setHeatingSetpoint(degrees, delay = 30000) 
+def setHeatingSetpoint(degrees) 
 {
-	setHeatingSetpoint(degrees.toDouble(), delay)
+	setHeatingSetpoint(degrees.toDouble())
 	log.debug("Degrees at setheatpoint: $degrees")
 }
 
-def setHeatingSetpoint(Double degrees, Integer delay = 30000) 
+def setHeatingSetpoint(Double degrees) 
 {
-	log.trace "setHeatingSetpoint($degrees, $delay)"
+	log.trace "setHeatingSetpoint($degrees)"
+    sendEvent(name: 'heatingSetpoint', value: degrees)
+
 	def deviceScale = state.scale ?: 1
 	def deviceScaleString = deviceScale == 2 ? "C" : "F"
     def locationScale = getTemperatureScale()
