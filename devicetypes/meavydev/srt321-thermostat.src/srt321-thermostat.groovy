@@ -16,6 +16,8 @@ metadata
 		command "switchMode"
         command "quickSetHeat"
 		command "setTemperature"
+		command "setTempUp"
+		command "setTempDown"
         
 		command "setupDevice" 
         		
@@ -40,12 +42,14 @@ metadata
             
             tileAttribute("device.heatingSetpoint", key: "VALUE_CONTROL") 
             {
-                attributeState("default", action: "setTemperature")
+                attributeState("VALUE_UP", action: "setTempUp")
+                attributeState("VALUE_DOWN", action: "setTempDown")
+//                attributeState("default", action: "setTemperature")
             }
             
             tileAttribute("device.temperature", key: "SECONDARY_CONTROL") 
             {
-            	attributeState("default", label:'${currentValue}', unit:"dC")
+            	attributeState("default", label:'${currentValue} C', unit:"C")
             }
             
             tileAttribute("device.thermostatMode", key: "THERMOSTAT_MODE") 
@@ -56,7 +60,7 @@ metadata
             
   			tileAttribute("device.heatingSetpoint", key: "HEATING_SETPOINT") 
             {
-    			attributeState("default", label:'${currentValue}', unit:"dC")
+    			attributeState("default", label:'${currentValue}', unit:"C")
 			}
             
             tileAttribute("device.thermostatMode", key: "OPERATING_STATE") 
