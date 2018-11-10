@@ -4,7 +4,9 @@
  */
 metadata 
 {
-	definition (name: "SRT321 Thermostat", namespace: "meavydev", author: "MeavyDev") 
+	definition (name: "SRT321 Thermostat", namespace: "meavydev", author: "MeavyDev",
+                mnmn: "SmartThings", vid: "generic-thermostat", ocfDeviceType: "oic.d.thermostat", 
+                minHubCoreVersion: '000.017.0012', executeCommandsLocally: false) 
     {
     	capability "Actuator"
 		capability "Temperature Measurement"
@@ -12,7 +14,8 @@ metadata
 		capability "Configuration"
 		capability "Polling"
 		capability "Sensor"
-
+        capability "Health Check"
+        
 		command "switchMode"
         command "quickSetHeat"
 		command "setTemperature"
@@ -116,11 +119,33 @@ def parse(String description)
 	result
 }
 
+def installed() 
+{
+	log.debug "preferences installed"
+
+	state.configNeeded = true
+    sendHealthCheckInterval()
+}
+
+
 def updated() 
 {
 	log.debug "preferences updated"
 
 	state.configNeeded = true
+    sendHealthCheckInterval()
+}
+
+def sendHealthCheckInterval()
+{
+    // Device-Watch simply pings if no device events received for 60min(checkInterval)
+	sendEvent(name: "checkInterval", value: 60 * 60, displayed: false, data: [protocol: "zwave", hubHardwareId: device.hub.hardwareID])
+}
+
+def ping()
+{
+	log.debug "ping"
+    state.refreshNeeded = true
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.thermostatmodev1.ThermostatModeSet cmd)
@@ -181,8 +206,21 @@ def zwaveEvent(physicalgraph.zwave.commands.wakeupv2.WakeUpNotification cmd)
 		cmds << zwave.wakeUpV2.wakeUpNoMoreInformation().format()
         
         log.debug "Wakeup $cmds"
+/*
+		cmds.each 
+        { zwaveCmd ->
+                def hubCmd = []
+                hubCmd << response(zwaveCmd)
 
-        [event, response(delayBetween(cmds, 1000))]      
+//               log.debug "HubCmds $hubCmd"
+
+                sendHubCommand(hubCmd, 1000)
+
+//                log.debug "Sent hubcommand"
+        };
+        [event]      
+*/        
+        [event, response(delayBetween(cmds, 1000))]
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) 
@@ -369,8 +407,7 @@ def setHeatingSetpoint(Double degrees)
     state.p = p
     state.convertedDegrees = convertedDegrees
     state.updateNeeded = true
-    
-    thermostatMode
+    // thermostatMode
 }
 
 private getStandardDelay() 
@@ -382,6 +419,8 @@ def updateIfNeeded()
 {
 	def cmds = []
     
+    log.debug "updateIfNeeded"
+    
     // Only ask for battery if we haven't had a BatteryReport in a while
     if (!state.lastbatt || (new Date().time) - state.lastbatt > 24*60*60*1000) 
     {
@@ -392,6 +431,8 @@ def updateIfNeeded()
 	if (state.refreshNeeded)
     {
         log.debug "Refresh"
+        sendEvent(name:"SRT321", value: "Refresh")
+
         cmds << zwave.sensorMultilevelV1.sensorMultilevelGet().format() // current temperature
 		cmds << zwave.thermostatSetpointV1.thermostatSetpointGet(setpointType: physicalgraph.zwave.commands.thermostatsetpointv1.ThermostatSetpointSet.SETPOINT_TYPE_HEATING_1).format()
 
@@ -403,8 +444,8 @@ def updateIfNeeded()
     
     if (state.updateNeeded)
     {
-        log.debug "Update"
-
+        log.debug "Updating setpoint $state.convertedDegrees"
+		sendEvent(name:"SRT321", value: "Updating setpoint $state.convertedDegrees")
 		cmds << zwave.thermostatSetpointV1.thermostatSetpointSet(setpointType: physicalgraph.zwave.commands.thermostatsetpointv1.ThermostatSetpointSet.SETPOINT_TYPE_HEATING_1, scale: state.deviceScale, precision: state.p, scaledValue: state.convertedDegrees).format()
         state.updateNeeded = false
     }
@@ -412,6 +453,7 @@ def updateIfNeeded()
     if (state.configNeeded)
     {
         log.debug "Config"
+		sendEvent(name:"SRT321", value: "Config")
     	state.configNeeded = false
         
         // Nodes controlled by Thermostat Mode Set - not sure this is needed?
